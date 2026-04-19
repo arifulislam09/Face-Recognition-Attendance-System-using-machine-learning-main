@@ -1,0 +1,99 @@
+body {
+    background: #e7f1ff;
+    color: #243b55;
+    min-height: 100vh;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+a {
+    color: #ffffff;
+}
+
+a:hover {
+    color: #d6e6ff;
+}
+
+.login-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+}
+
+.login-card {
+    max-width: 420px;
+    width: 100%;
+    border: none;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 25px 45px rgba(15, 23, 42, 0.25);
+}
+
+.sidebar {
+    background: #1a3e72;
+    min-height: 100vh;
+    padding: 1.5rem 1rem;
+}
+
+.sidebar .nav-link {
+    color: #cbd5e1;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+}
+
+.sidebar .nav-link.active,
+.sidebar .nav-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border-radius: 0.65rem;
+}
+
+.navbar-custom {
+    background: #2a5298;
+}
+
+.card-custom {
+    border: none;
+    border-radius: 1rem;
+    box-shadow: 0 12px 30px rgba(72, 94, 116, 0.16);
+}
+
+.btn-primary {
+    background-color: #1967d2;
+    border-color: #1967d2;
+}
+
+.btn-primary:hover {
+    background-color: #154f9f;
+    border-color: #154f9f;
+}
+
+.table thead {
+    background: #1a3e72;
+    color: #ffffff;
+}
+
+.table-hover tbody tr:hover {
+    background: rgba(25, 103, 210, 0.08);
+}
+
+.footer-note {
+    color: #6b7280;
+}
+
+.flash-message {
+    margin-top: 1rem;
+}
+
+@media (max-width: 992px) {
+    .sidebar {
+        min-height: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        display: none;
+    }
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scanner | Face Attendance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  </head>
+  <body>
+    <div class="d-flex">
+      <div class="sidebar">
+        <h4 class="text-white mb-4">Face Attendance</h4>
+        <nav class="nav flex-column">
+          <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+          <a class="nav-link" href="{{ url_for('register') }}">Register Student</a>
+          <a class="nav-link active" href="{{ url_for('scanner') }}">Attendance Scanner</a>
+          <a class="nav-link" href="{{ url_for('records') }}">Attendance Records</a>
+          <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+        </nav>
+      </div>
+      <div class="flex-grow-1">
+        <nav class="navbar navbar-expand-lg navbar-custom px-4 py-3">
+          <div class="container-fluid">
+            <button class="btn btn-outline-light d-lg-none" type="button" id="sidebarToggle">Menu</button>
+            <span class="navbar-brand mb-0 h1 text-white">Attendance Scanner</span>
+            <div class="text-white">{{ session['user'] }}</div>
+          </div>
+        </nav>
+        <main class="p-4">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <div class="card card-custom p-4 mb-4">
+            <h4 class="mb-3">Start Face Recognition</h4>
+            <p class="text-muted">Click the button below to open your webcam and automatically mark attendance for registered faces.</p>
+            <form method="post" action="{{ url_for('start_scan') }}">
+              <button type="submit" class="btn btn-primary">Start Scan</button>
+            </form>
+          </div>
+
+          <div class="card card-custom p-4">
+            <h5>How it works</h5>
+            <ul class="list-unstyled mb-0">
+              <li>• The webcam captures faces.</li>
+              <li>• Registered student images are matched with live faces.</li>
+              <li>• Attendance is marked automatically if a match is found.</li>
+              <li>• Duplicate attendance is blocked for the same day.</li>
+            </ul>
+          </div>
+        </main>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  </body>
+</html>
