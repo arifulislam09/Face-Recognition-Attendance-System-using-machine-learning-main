@@ -211,6 +211,7 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+        login_portal = request.form.get("login_portal", "").strip().lower()
 
         if not username or not password:
             flash("Please enter both username and password.", "warning")
@@ -224,6 +225,10 @@ def login():
         conn.close()
 
         if user:
+            if login_portal in {"admin", "student"} and user["role"] != login_portal:
+                flash(f"This account is not registered for {login_portal} portal login.", "danger")
+                return redirect(url_for("login"))
+
             if is_student_pending(user):
                 flash("Your student account is pending admin approval. Please wait for approval.", "warning")
                 return redirect(url_for("login"))
