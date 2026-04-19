@@ -2,7 +2,6 @@ import os
 import sqlite3
 import csv
 import io
-import json
 import requests
 import numpy as np
 import cv2
@@ -18,6 +17,7 @@ app.secret_key = "supersecretkey123"
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.path.join(BASE_DIR, "database.db")
@@ -85,6 +85,12 @@ def init_db():
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def get_google_redirect_uri():
+    if GOOGLE_REDIRECT_URI:
+        return GOOGLE_REDIRECT_URI
+    return url_for("google_callback", _external=True)
 
 
 def load_face_recognizer():
@@ -195,16 +201,29 @@ def login():
 
 
 @app.route("/auth/google")
+@app.route("/login/google")
 def google_login():
     if not GOOGLE_CLIENT_ID:
-        flash("Gmail login is not configured. Please set GOOGLE_CLIENT_ID.", "warning")
+        flash("Google login is not configured. Please set GOOGLE_CLIENT_ID.", "warning")
         return redirect(url_for("login"))
-    
+
     google_discovery_url = GOOGLE_DISCOVERY_URL
     discovery = requests.get(google_discovery_url).json()
     auth_endpoint = discovery["authorization_endpoint"]
-    
-    request_uri = f"{auth_endpoint}?client_id={GOOGLE_CLIENT_ID}&response_type=code&scope=openid%20email%20profile&redirect_uri=http://127.0.0.1:5000/auth/google/callback"
+
+    redirect_uri = get_google_redirect_uri()
+    request_uri = requests.Request(
+        "GET",
+        auth_endpoint,
+        params={
+            "client_id": GOOGLE_CLIENT_ID,
+            "response_type": "code",
+            "scope": "openid email profile",
+            "redirect_uri": redirect_uri,
+            "access_type": "online",
+            "prompt": "select_account",
+        },
+    ).prepare().url
     return redirect(request_uri)
 
 
@@ -212,51 +231,63 @@ def google_login():
 def google_callback():
     code = request.args.get("code")
     if not code or not GOOGLE_CLIENT_ID:
-        flash("Gmail authentication failed.", "danger")
+        flash("Google authentication failed.", "danger")
         return redirect(url_for("login"))
-    
+
     try:
         google_discovery_url = GOOGLE_DISCOVERY_URL
         discovery = requests.get(google_discovery_url).json()
         token_endpoint = discovery["token_endpoint"]
-        
+
+        redirect_uri = get_google_redirect_uri()
         token_request_data = {
             "code": code,
             "client_id": GOOGLE_CLIENT_ID,
             "client_secret": GOOGLE_CLIENT_SECRET,
-            "redirect_uri": "http://127.0.0.1:5000/auth/google/callback",
+            "redirect_uri": redirect_uri,
             "grant_type": "authorization_code",
         }
-        
-        token_response = requests.post(token_endpoint, json=token_request_data).json()
+
+        token_response = requests.post(token_endpoint, data=token_request_data, timeout=15)
+        token_response.raise_for_status()
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            raise ValueError("No access token returned from Google.")
+
         user_info_url = discovery["userinfo_endpoint"]
-        user_info = requests.get(user_info_url, headers={"Authorization": f"Bearer {token_response['access_token']}"})
+        user_info = requests.get(
+            user_info_url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=15,
+        )
+        user_info.raise_for_status()
         user_data = user_info.json()
-        
+
         email = user_data.get("email", "")
         name = user_data.get("name", email)
-        
+
         if not email:
-            flash("Unable to get email from Gmail. Please try again.", "danger")
+            flash("Unable to get email from Google. Please try again.", "danger")
             return redirect(url_for("login"))
-        
+
         conn = get_db()
         user = conn.execute("SELECT * FROM Users WHERE username = ?", (email,)).fetchone()
-        
+
         if not user:
             conn.execute(
                 "INSERT INTO Users (username, password, role) VALUES (?, ?, ?)",
                 (email, "google_oauth", "user"),
             )
             conn.commit()
-        
+
         conn.close()
-        
+
         session["user"] = email
         session["role"] = "user"
         flash(f"Login successful. Welcome, {name}!", "success")
         return redirect(url_for("user_dashboard"))
-    
+
     except Exception as e:
         flash(f"Gmail authentication error: {str(e)}", "danger")
         return redirect(url_for("login"))
