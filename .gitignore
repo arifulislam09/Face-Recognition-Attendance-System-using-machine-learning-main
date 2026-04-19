@@ -1,0 +1,17 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+venv/
+
+# Local app runtime data
+project/database.db
+Face Recognition/Attendance.csv
+
+# User uploaded/generated images
+project/dataset/*
+!project/dataset/.gitkeep
+project/static/images/*
+!project/static/images/.gitkeep

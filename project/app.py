@@ -331,7 +331,7 @@ def admin_dashboard():
     conn.close()
 
     return render_template(
-        "admin_dashboard.html",
+        "dashboard.html",
         student_count=student_count,
         total_records=total_records,
         today_records=today_records,
@@ -353,9 +353,11 @@ def user_dashboard():
     conn.close()
 
     return render_template(
-        "user_dashboard.html",
+        "dashboard.html",
+        student_count=0,
         total_records=total_records,
         today_records=today_records,
+        recent_students=[],
     )
 
 
@@ -445,7 +447,9 @@ def scanner():
     if not session.get("user") or session.get("role") != "admin":
         flash("Only admins can access the scanner.", "danger")
         return redirect(url_for("user_dashboard" if session.get("user") else "login"))
-    return render_template("scanner.html")
+
+    cloud_hosted = os.environ.get("RENDER", "").lower() == "true"
+    return render_template("scanner.html", cloud_hosted=cloud_hosted)
 
 
 @app.route("/start_scan", methods=["POST"])
@@ -454,7 +458,9 @@ def start_scan():
         flash("Only admins can start scanning.", "danger")
         return redirect(url_for("user_dashboard" if session.get("user") else "login"))
 
-        return redirect(url_for("user_dashboard" if session.get("user") else "login"))
+    if os.environ.get("RENDER", "").lower() == "true":
+        flash("Webcam-based scanning is not available on Render. Run the scanner locally.", "warning")
+        return redirect(url_for("scanner"))
 
     recognizer, label_map = load_face_recognizer()
     if recognizer is None:
@@ -573,3 +579,5 @@ def download_csv():
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)
+
+init_db()

@@ -41,9 +41,14 @@
 
           <div class="card card-custom p-4 mb-4">
             <h4 class="mb-3">Start Face Recognition</h4>
+            {% if cloud_hosted %}
+              <div class="alert alert-warning" role="alert">
+                Webcam-based scanning is not available on Render. Use this feature locally on your computer.
+              </div>
+            {% endif %}
             <p class="text-muted">Click the button below to open your webcam and automatically mark attendance for registered faces.</p>
             <form method="post" action="{{ url_for('start_scan') }}">
-              <button type="submit" class="btn btn-primary">Start Scan</button>
+              <button type="submit" class="btn btn-primary" {% if cloud_hosted %}disabled{% endif %}>Start Scan</button>
             </form>
           </div>
 

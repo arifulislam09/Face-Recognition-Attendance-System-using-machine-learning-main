@@ -25,6 +25,18 @@ Installation:
 5. Open the web app in your browser:
    http://localhost:5000
 
+Render Deployment:
+1. Push this repository to GitHub.
+2. Create a new Render Web Service from the repo root.
+3. Render will use the provided `render.yaml` and `Procfile`.
+4. Build command: `pip install -r requirements.txt`
+5. Start command: `gunicorn --chdir project app:app`
+
+Important:
+- The web dashboard, login, registration, and attendance records can run on Render.
+- Webcam-based live face scanning does not work on Render because cloud servers do not have access to your local camera.
+- Run the scanner locally if you need live webcam attendance capture.
+
 Usage:
 1. Open the web app in your browser.
 
