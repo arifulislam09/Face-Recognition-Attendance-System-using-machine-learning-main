@@ -131,7 +131,14 @@ def is_student_pending(user_row):
     return user_row["role"] == "student" and user_row["approval_status"] != "approved"
 
 
+def has_lbph_support():
+    return hasattr(cv2, "face") and hasattr(cv2.face, "LBPHFaceRecognizer_create")
+
+
 def load_face_recognizer():
+    if not has_lbph_support():
+        return None, {}
+
     conn = get_db()
     rows = conn.execute("SELECT * FROM Students").fetchall()
     conn.close()
@@ -652,6 +659,13 @@ def start_scan():
 
     if os.environ.get("RENDER", "").lower() == "true":
         flash("Webcam-based scanning is not available on Render. Run the scanner locally.", "warning")
+        return redirect(url_for("scanner"))
+
+    if not has_lbph_support():
+        flash(
+            "Face recognizer is unavailable. Install opencv-contrib-python (or opencv-contrib-python-headless in server environments).",
+            "danger",
+        )
         return redirect(url_for("scanner"))
 
     recognizer, label_map = load_face_recognizer()
