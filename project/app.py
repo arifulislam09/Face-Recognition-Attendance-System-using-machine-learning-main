@@ -46,7 +46,14 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            role TEXT DEFAULT 'user'
+            role TEXT DEFAULT 'student',
+            full_name TEXT,
+            department TEXT,
+            approval_status TEXT DEFAULT 'pending',
+            created_at TEXT,
+            approved_at TEXT,
+            approved_by TEXT,
+            auth_provider TEXT DEFAULT 'password'
         )
         """
     )
@@ -76,9 +83,36 @@ def init_db():
     cur.execute("SELECT id FROM Users WHERE username = ?", ("admin",))
     if not cur.fetchone():
         cur.execute(
-            "INSERT INTO Users (username, password, role) VALUES (?, ?, ?)",
-            ("admin", "admin123", "admin"),
+            "INSERT INTO Users (username, password, role, full_name, approval_status, created_at, auth_provider) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("admin", "admin123", "admin", "System Admin", "approved", datetime.now().isoformat(), "password"),
         )
+
+    # Lightweight migration so existing databases also support approval workflow.
+    user_columns = {row[1] for row in cur.execute("PRAGMA table_info(Users)").fetchall()}
+    required_columns = {
+        "full_name": "TEXT",
+        "department": "TEXT",
+        "approval_status": "TEXT DEFAULT 'pending'",
+        "created_at": "TEXT",
+        "approved_at": "TEXT",
+        "approved_by": "TEXT",
+        "auth_provider": "TEXT DEFAULT 'password'",
+    }
+    for column_name, column_type in required_columns.items():
+        if column_name not in user_columns:
+            cur.execute(f"ALTER TABLE Users ADD COLUMN {column_name} {column_type}")
+
+    cur.execute(
+        "UPDATE Users SET role = 'student' WHERE role = 'user'"
+    )
+    cur.execute(
+        "UPDATE Users SET approval_status = 'approved', auth_provider = COALESCE(auth_provider, 'password') WHERE username = 'admin'"
+    )
+    cur.execute(
+        "UPDATE Users SET approval_status = COALESCE(approval_status, 'pending'), created_at = COALESCE(created_at, ?) WHERE username != 'admin'",
+        (datetime.now().isoformat(),),
+    )
+
     conn.commit()
     conn.close()
 
@@ -91,6 +125,10 @@ def get_google_redirect_uri():
     if GOOGLE_REDIRECT_URI:
         return GOOGLE_REDIRECT_URI
     return url_for("google_callback", _external=True)
+
+
+def is_student_pending(user_row):
+    return user_row["role"] == "student" and user_row["approval_status"] != "approved"
 
 
 def load_face_recognizer():
@@ -186,6 +224,10 @@ def login():
         conn.close()
 
         if user:
+            if is_student_pending(user):
+                flash("Your student account is pending admin approval. Please wait for approval.", "warning")
+                return redirect(url_for("login"))
+
             session["user"] = username
             session["role"] = user["role"]
             flash(f"Login successful. Welcome back, {user['role']}!", "success")
@@ -276,20 +318,32 @@ def google_callback():
 
         if not user:
             conn.execute(
-                "INSERT INTO Users (username, password, role) VALUES (?, ?, ?)",
-                (email, "google_oauth", "user"),
+                "INSERT INTO Users (username, password, role, full_name, approval_status, created_at, auth_provider) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (email, "google_oauth", "student", name, "pending", datetime.now().isoformat(), "google"),
             )
             conn.commit()
+            conn.close()
+            session["pending_registration_user"] = email
+            flash("Google login successful. Complete student registration for admin approval.", "info")
+            return redirect(url_for("student_registration_request"))
+
+        if is_student_pending(user):
+            conn.close()
+            session["pending_registration_user"] = email
+            flash("Your account is pending. Complete your registration details and wait for admin approval.", "warning")
+            return redirect(url_for("student_registration_request"))
 
         conn.close()
 
         session["user"] = email
-        session["role"] = "user"
+        session["role"] = user["role"]
         flash(f"Login successful. Welcome, {name}!", "success")
+        if user["role"] == "admin":
+            return redirect(url_for("admin_dashboard"))
         return redirect(url_for("user_dashboard"))
 
     except Exception as e:
-        flash(f"Gmail authentication error: {str(e)}", "danger")
+        flash(f"Google authentication error: {str(e)}", "danger")
         return redirect(url_for("login"))
 
 
@@ -303,11 +357,12 @@ def signup():
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
+        full_name = request.form.get("full_name", "").strip()
+        department = request.form.get("department", "").strip()
         password = request.form.get("password", "").strip()
         confirm_password = request.form.get("confirm_password", "").strip()
-        role = request.form.get("role", "user").strip()
 
-        if not username or not password or not confirm_password:
+        if not username or not full_name or not department or not password or not confirm_password:
             flash("Please complete all fields.", "warning")
             return redirect(url_for("signup"))
 
@@ -315,18 +370,15 @@ def signup():
             flash("Passwords do not match. Please try again.", "danger")
             return redirect(url_for("signup"))
 
-        if role not in ["admin", "user"]:
-            role = "user"
-
         conn = get_db()
         try:
             conn.execute(
-                "INSERT INTO Users (username, password, role) VALUES (?, ?, ?)",
-                (username, password, role),
+                "INSERT INTO Users (username, password, role, full_name, department, approval_status, created_at, auth_provider) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (username, password, "student", full_name, department, "pending", datetime.now().isoformat(), "password"),
             )
             conn.commit()
             conn.close()
-            flash("Account created successfully. Please sign in.", "success")
+            flash("Registration submitted. Wait for admin approval before login.", "info")
             return redirect(url_for("login"))
         except sqlite3.IntegrityError:
             conn.close()
@@ -334,6 +386,52 @@ def signup():
             return redirect(url_for("signup"))
 
     return render_template("signup.html")
+
+
+@app.route("/student-registration", methods=["GET", "POST"])
+def student_registration_request():
+    pending_email = session.get("pending_registration_user")
+    if not pending_email:
+        flash("Start with Google login to submit a student registration request.", "warning")
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM Users WHERE username = ?", (pending_email,)).fetchone()
+    if not user:
+        conn.close()
+        session.pop("pending_registration_user", None)
+        flash("Registration session expired. Please sign in again.", "warning")
+        return redirect(url_for("login"))
+
+    if user["approval_status"] == "approved":
+        conn.close()
+        session.pop("pending_registration_user", None)
+        session["user"] = user["username"]
+        session["role"] = user["role"]
+        flash("Your account is already approved. Welcome back!", "success")
+        return redirect(url_for("user_dashboard"))
+
+    if request.method == "POST":
+        full_name = request.form.get("full_name", "").strip()
+        department = request.form.get("department", "").strip()
+
+        if not full_name or not department:
+            flash("Please enter your full name and department.", "warning")
+            conn.close()
+            return redirect(url_for("student_registration_request"))
+
+        conn.execute(
+            "UPDATE Users SET full_name = ?, department = ?, approval_status = 'pending', created_at = COALESCE(created_at, ?), auth_provider = COALESCE(auth_provider, 'google') WHERE id = ?",
+            (full_name, department, datetime.now().isoformat(), user["id"]),
+        )
+        conn.commit()
+        conn.close()
+        session.pop("pending_registration_user", None)
+        flash("Registration request submitted. Admin approval is required.", "info")
+        return redirect(url_for("login"))
+
+    conn.close()
+    return render_template("student_registration.html", user=user)
 
 
 @app.route("/logout")
@@ -352,6 +450,18 @@ def admin_dashboard():
     today = datetime.now().strftime("%Y-%m-%d")
     conn = get_db()
     student_count = conn.execute("SELECT COUNT(*) FROM Students").fetchone()[0]
+    total_student_accounts = conn.execute(
+        "SELECT COUNT(*) FROM Users WHERE role = 'student'"
+    ).fetchone()[0]
+    approved_student_accounts = conn.execute(
+        "SELECT COUNT(*) FROM Users WHERE role = 'student' AND approval_status = 'approved'"
+    ).fetchone()[0]
+    pending_student_requests = conn.execute(
+        "SELECT COUNT(*) FROM Users WHERE role = 'student' AND approval_status = 'pending'"
+    ).fetchone()[0]
+    pending_users = conn.execute(
+        "SELECT id, username, full_name, department, created_at FROM Users WHERE role = 'student' AND approval_status = 'pending' ORDER BY id DESC"
+    ).fetchall()
     total_records = conn.execute("SELECT COUNT(*) FROM Attendance").fetchone()[0]
     today_records = conn.execute(
         "SELECT COUNT(*) FROM Attendance WHERE date = ?", (today,)
@@ -364,19 +474,32 @@ def admin_dashboard():
     return render_template(
         "dashboard.html",
         student_count=student_count,
+        total_student_accounts=total_student_accounts,
+        approved_student_accounts=approved_student_accounts,
+        pending_student_requests=pending_student_requests,
+        pending_users=pending_users,
         total_records=total_records,
         today_records=today_records,
         recent_students=recent_students,
+        is_admin=True,
     )
 
 
 @app.route("/user_dashboard")
 def user_dashboard():
-    if not session.get("user") or session.get("role") != "user":
+    if not session.get("user") or session.get("role") != "student":
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM Users WHERE username = ?", (session["user"],)).fetchone()
+    if not user or is_student_pending(user):
+        conn.close()
+        session.pop("user", None)
+        session.pop("role", None)
+        flash("Your account is pending admin approval.", "warning")
         return redirect(url_for("login"))
 
     today = datetime.now().strftime("%Y-%m-%d")
-    conn = get_db()
     total_records = conn.execute("SELECT COUNT(*) FROM Attendance").fetchone()[0]
     today_records = conn.execute(
         "SELECT COUNT(*) FROM Attendance WHERE date = ?", (today,)
@@ -386,10 +509,38 @@ def user_dashboard():
     return render_template(
         "dashboard.html",
         student_count=0,
+        total_student_accounts=0,
+        approved_student_accounts=0,
+        pending_student_requests=0,
+        pending_users=[],
         total_records=total_records,
         today_records=today_records,
         recent_students=[],
+        is_admin=False,
     )
+
+
+@app.route("/approve_user/<int:user_id>")
+def approve_user(user_id):
+    if not session.get("user") or session.get("role") != "admin":
+        flash("Only admins can approve students.", "danger")
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM Users WHERE id = ?", (user_id,)).fetchone()
+    if not user or user["role"] != "student":
+        conn.close()
+        flash("Student request not found.", "warning")
+        return redirect(url_for("admin_dashboard"))
+
+    conn.execute(
+        "UPDATE Users SET approval_status = 'approved', approved_at = ?, approved_by = ? WHERE id = ?",
+        (datetime.now().isoformat(), session.get("user", "admin"), user_id),
+    )
+    conn.commit()
+    conn.close()
+    flash("Student registration approved successfully.", "success")
+    return redirect(url_for("admin_dashboard"))
 
 
 @app.route("/dashboard")
