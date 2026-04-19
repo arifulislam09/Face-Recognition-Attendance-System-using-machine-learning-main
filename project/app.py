@@ -462,6 +462,9 @@ def admin_dashboard():
     pending_users = conn.execute(
         "SELECT id, username, full_name, department, created_at FROM Users WHERE role = 'student' AND approval_status = 'pending' ORDER BY id DESC"
     ).fetchall()
+    approved_users = conn.execute(
+        "SELECT username, full_name, department, approved_at, approved_by FROM Users WHERE role = 'student' AND approval_status = 'approved' ORDER BY id DESC LIMIT 10"
+    ).fetchall()
     total_records = conn.execute("SELECT COUNT(*) FROM Attendance").fetchone()[0]
     today_records = conn.execute(
         "SELECT COUNT(*) FROM Attendance WHERE date = ?", (today,)
@@ -478,6 +481,7 @@ def admin_dashboard():
         approved_student_accounts=approved_student_accounts,
         pending_student_requests=pending_student_requests,
         pending_users=pending_users,
+        approved_users=approved_users,
         total_records=total_records,
         today_records=today_records,
         recent_students=recent_students,
@@ -513,6 +517,7 @@ def user_dashboard():
         approved_student_accounts=0,
         pending_student_requests=0,
         pending_users=[],
+        approved_users=[],
         total_records=total_records,
         today_records=today_records,
         recent_students=[],

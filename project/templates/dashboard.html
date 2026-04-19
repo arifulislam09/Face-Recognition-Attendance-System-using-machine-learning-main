@@ -41,13 +41,20 @@
             {% endif %}
           {% endwith %}
 
+          {% if is_admin %}
+          <div class="alert alert-info" role="alert">
+            <strong>Relation:</strong> Student account approval (Google/Signup) and face profile registration are separate steps.
+            Approve account requests first, then add face profile from Register Student.
+          </div>
+          {% endif %}
+
           <div class="row g-4 mb-4">
             <div class="col-md-4">
               <div class="card card-custom p-4 h-100">
                 {% if is_admin %}
                 <h5>Registered Profiles</h5>
                 <p class="display-6 fw-bold">{{ student_count }}</p>
-                <p class="text-muted">Total student face profiles stored</p>
+                <p class="text-muted">Step 2: total face profiles added by admin</p>
                 {% else %}
                 <h5>Account Status</h5>
                 <p class="display-6 fw-bold">Approved</p>
@@ -60,7 +67,7 @@
                 {% if is_admin %}
                 <h5>Pending Requests</h5>
                 <p class="display-6 fw-bold">{{ pending_student_requests }}</p>
-                <p class="text-muted">Student registrations waiting approval</p>
+                <p class="text-muted">Step 1: student accounts waiting admin approval</p>
                 {% else %}
                 <h5>Today Attendance</h5>
                 <p class="display-6 fw-bold">{{ today_records }}</p>
@@ -73,7 +80,7 @@
                 {% if is_admin %}
                 <h5>Approved Students</h5>
                 <p class="display-6 fw-bold">{{ approved_student_accounts }}/{{ total_student_accounts }}</p>
-                <p class="text-muted">Approved vs total student accounts</p>
+                <p class="text-muted">Approved student login accounts</p>
                 {% else %}
                 <h5>Total Records</h5>
                 <p class="display-6 fw-bold">{{ total_records }}</p>
@@ -102,7 +109,7 @@
                 <a href="{{ url_for('records') }}" class="btn btn-primary w-100">View Records</a>
               </div>
               <div class="col-sm-6 col-xl-3">
-                <a href="{{ url_for('logout') }}" class="btn btn-outline-light w-100">Logout</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-secondary w-100">Logout</a>
               </div>
             </div>
           </div>
@@ -140,6 +147,44 @@
                   {% else %}
                     <tr>
                       <td colspan="6" class="text-center text-muted">No pending student approvals.</td>
+                    </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if is_admin %}
+          <div class="card card-custom p-4 mt-4">
+            <h5 class="mb-3">Recently Approved Student Accounts</h5>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Email</th>
+                    <th>Full Name</th>
+                    <th>Department</th>
+                    <th>Approved At</th>
+                    <th>Approved By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% if approved_users %}
+                    {% for user in approved_users %}
+                      <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ user['username'] }}</td>
+                        <td>{{ user['full_name'] or 'Not provided' }}</td>
+                        <td>{{ user['department'] or 'Not provided' }}</td>
+                        <td>{{ user['approved_at'] or '-' }}</td>
+                        <td>{{ user['approved_by'] or '-' }}</td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr>
+                      <td colspan="6" class="text-center text-muted">No approved student accounts yet.</td>
                     </tr>
                   {% endif %}
                 </tbody>
