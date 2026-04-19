@@ -2,6 +2,8 @@ import os
 import sqlite3
 import csv
 import io
+import json
+import requests
 import numpy as np
 import cv2
 from io import BytesIO
@@ -11,6 +13,11 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey123"
+
+# Gmail OAuth Config (Update with your Google OAuth credentials)
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.path.join(BASE_DIR, "database.db")
@@ -38,7 +45,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS Users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            role TEXT DEFAULT 'user'
         )
         """
     )
@@ -68,8 +76,8 @@ def init_db():
     cur.execute("SELECT id FROM Users WHERE username = ?", ("admin",))
     if not cur.fetchone():
         cur.execute(
-            "INSERT INTO Users (username, password) VALUES (?, ?)",
-            ("admin", "admin123"),
+            "INSERT INTO Users (username, password, role) VALUES (?, ?, ?)",
+            ("admin", "admin123", "admin"),
         )
     conn.commit()
     conn.close()
@@ -141,14 +149,20 @@ def mark_attendance(student_id, name):
 @app.route("/")
 def home():
     if session.get("user"):
-        return redirect(url_for("dashboard"))
+        if session.get("role") == "admin":
+            return redirect(url_for("admin_dashboard"))
+        else:
+            return redirect(url_for("user_dashboard"))
     return redirect(url_for("login"))
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if session.get("user"):
-        return redirect(url_for("dashboard"))
+        if session.get("role") == "admin":
+            return redirect(url_for("admin_dashboard"))
+        else:
+            return redirect(url_for("user_dashboard"))
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -167,8 +181,12 @@ def login():
 
         if user:
             session["user"] = username
-            flash("Login successful. Welcome back!", "success")
-            return redirect(url_for("dashboard"))
+            session["role"] = user["role"]
+            flash(f"Login successful. Welcome back, {user['role']}!", "success")
+            if user["role"] == "admin":
+                return redirect(url_for("admin_dashboard"))
+            else:
+                return redirect(url_for("user_dashboard"))
 
         flash("Login failed. Check your username and password.", "danger")
         return redirect(url_for("login"))
@@ -176,15 +194,87 @@ def login():
     return render_template("login.html")
 
 
+@app.route("/auth/google")
+def google_login():
+    if not GOOGLE_CLIENT_ID:
+        flash("Gmail login is not configured. Please set GOOGLE_CLIENT_ID.", "warning")
+        return redirect(url_for("login"))
+    
+    google_discovery_url = GOOGLE_DISCOVERY_URL
+    discovery = requests.get(google_discovery_url).json()
+    auth_endpoint = discovery["authorization_endpoint"]
+    
+    request_uri = f"{auth_endpoint}?client_id={GOOGLE_CLIENT_ID}&response_type=code&scope=openid%20email%20profile&redirect_uri=http://127.0.0.1:5000/auth/google/callback"
+    return redirect(request_uri)
+
+
+@app.route("/auth/google/callback")
+def google_callback():
+    code = request.args.get("code")
+    if not code or not GOOGLE_CLIENT_ID:
+        flash("Gmail authentication failed.", "danger")
+        return redirect(url_for("login"))
+    
+    try:
+        google_discovery_url = GOOGLE_DISCOVERY_URL
+        discovery = requests.get(google_discovery_url).json()
+        token_endpoint = discovery["token_endpoint"]
+        
+        token_request_data = {
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": "http://127.0.0.1:5000/auth/google/callback",
+            "grant_type": "authorization_code",
+        }
+        
+        token_response = requests.post(token_endpoint, json=token_request_data).json()
+        user_info_url = discovery["userinfo_endpoint"]
+        user_info = requests.get(user_info_url, headers={"Authorization": f"Bearer {token_response['access_token']}"})
+        user_data = user_info.json()
+        
+        email = user_data.get("email", "")
+        name = user_data.get("name", email)
+        
+        if not email:
+            flash("Unable to get email from Gmail. Please try again.", "danger")
+            return redirect(url_for("login"))
+        
+        conn = get_db()
+        user = conn.execute("SELECT * FROM Users WHERE username = ?", (email,)).fetchone()
+        
+        if not user:
+            conn.execute(
+                "INSERT INTO Users (username, password, role) VALUES (?, ?, ?)",
+                (email, "google_oauth", "user"),
+            )
+            conn.commit()
+        
+        conn.close()
+        
+        session["user"] = email
+        session["role"] = "user"
+        flash(f"Login successful. Welcome, {name}!", "success")
+        return redirect(url_for("user_dashboard"))
+    
+    except Exception as e:
+        flash(f"Gmail authentication error: {str(e)}", "danger")
+        return redirect(url_for("login"))
+
+
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if session.get("user"):
-        return redirect(url_for("dashboard"))
+        if session.get("role") == "admin":
+            return redirect(url_for("admin_dashboard"))
+        else:
+            return redirect(url_for("user_dashboard"))
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
         confirm_password = request.form.get("confirm_password", "").strip()
+        role = request.form.get("role", "user").strip()
 
         if not username or not password or not confirm_password:
             flash("Please complete all fields.", "warning")
@@ -194,11 +284,14 @@ def signup():
             flash("Passwords do not match. Please try again.", "danger")
             return redirect(url_for("signup"))
 
+        if role not in ["admin", "user"]:
+            role = "user"
+
         conn = get_db()
         try:
             conn.execute(
-                "INSERT INTO Users (username, password) VALUES (?, ?)",
-                (username, password),
+                "INSERT INTO Users (username, password, role) VALUES (?, ?, ?)",
+                (username, password, role),
             )
             conn.commit()
             conn.close()
@@ -215,13 +308,14 @@ def signup():
 @app.route("/logout")
 def logout():
     session.pop("user", None)
+    session.pop("role", None)
     flash("You have been logged out successfully.", "info")
     return redirect(url_for("login"))
 
 
-@app.route("/dashboard")
-def dashboard():
-    if not session.get("user"):
+@app.route("/admin_dashboard")
+def admin_dashboard():
+    if not session.get("user") or session.get("role") != "admin":
         return redirect(url_for("login"))
 
     today = datetime.now().strftime("%Y-%m-%d")
@@ -237,7 +331,7 @@ def dashboard():
     conn.close()
 
     return render_template(
-        "dashboard.html",
+        "admin_dashboard.html",
         student_count=student_count,
         total_records=total_records,
         today_records=today_records,
@@ -245,10 +339,39 @@ def dashboard():
     )
 
 
+@app.route("/user_dashboard")
+def user_dashboard():
+    if not session.get("user") or session.get("role") != "user":
+        return redirect(url_for("login"))
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    conn = get_db()
+    total_records = conn.execute("SELECT COUNT(*) FROM Attendance").fetchone()[0]
+    today_records = conn.execute(
+        "SELECT COUNT(*) FROM Attendance WHERE date = ?", (today,)
+    ).fetchone()[0]
+    conn.close()
+
+    return render_template(
+        "user_dashboard.html",
+        total_records=total_records,
+        today_records=today_records,
+    )
+
+
+@app.route("/dashboard")
+def dashboard():
+    if session.get("role") == "admin":
+        return redirect(url_for("admin_dashboard"))
+    else:
+        return redirect(url_for("user_dashboard"))
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    if not session.get("user"):
-        return redirect(url_for("login"))
+    if not session.get("user") or session.get("role") != "admin":
+        flash("Only admins can register students.", "danger")
+        return redirect(url_for("user_dashboard" if session.get("user") else "login"))
 
     conn = get_db()
     students = conn.execute("SELECT * FROM Students ORDER BY id DESC").fetchall()
@@ -298,8 +421,9 @@ def register():
 
 @app.route("/delete_student/<int:student_id>")
 def delete_student(student_id):
-    if not session.get("user"):
-        return redirect(url_for("login"))
+    if not session.get("user") or session.get("role") != "admin":
+        flash("Only admins can delete students.", "danger")
+        return redirect(url_for("user_dashboard" if session.get("user") else "login"))
 
     conn = get_db()
     row = conn.execute("SELECT * FROM Students WHERE id = ?", (student_id,)).fetchone()
@@ -318,15 +442,19 @@ def delete_student(student_id):
 
 @app.route("/scanner")
 def scanner():
-    if not session.get("user"):
-        return redirect(url_for("login"))
+    if not session.get("user") or session.get("role") != "admin":
+        flash("Only admins can access the scanner.", "danger")
+        return redirect(url_for("user_dashboard" if session.get("user") else "login"))
     return render_template("scanner.html")
 
 
 @app.route("/start_scan", methods=["POST"])
 def start_scan():
-    if not session.get("user"):
-        return redirect(url_for("login"))
+    if not session.get("user") or session.get("role") != "admin":
+        flash("Only admins can start scanning.", "danger")
+        return redirect(url_for("user_dashboard" if session.get("user") else "login"))
+
+        return redirect(url_for("user_dashboard" if session.get("user") else "login"))
 
     recognizer, label_map = load_face_recognizer()
     if recognizer is None:
