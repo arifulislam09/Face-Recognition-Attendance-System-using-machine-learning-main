@@ -1,6 +1,6 @@
 # Face Recognition Attendance System
 
-This is a beginner-friendly Python Flask attendance system using OpenCV and face_recognition.
+This is a beginner-friendly Python Flask attendance system using OpenCV LBPH face recognition.
 The app stores student data in SQLite, captures faces from the webcam, and automatically marks attendance.
 
 ## Folder Structure
@@ -23,28 +23,44 @@ project/
 
 ## Setup in VS Code
 
-1. Open VS Code and open the `project` folder.
-2. Open a terminal in VS Code.
-3. Create a Python virtual environment:
+> Important: This project requires Python 3.11 on Windows.
+
+1. **Install Python 3.11**:
+   - Download from: https://www.python.org/downloads/release/python-3110/
+   - Install it (add to PATH if asked).
+
+2. Open VS Code and open the `project` folder.
+
+3. Open a terminal in VS Code (inside `project` folder).
+
+4. Run the setup script:
    ```powershell
-   python -m venv venv
+   .\setup.bat
    ```
-4. Activate the virtual environment:
-   ```powershell
-   .\venv\Scripts\Activate
-   ```
-5. Install dependencies:
-   ```powershell
-   pip install -r requirements.txt
-   ```
-6. Run the Flask app:
-   ```powershell
-   python app.py
-   ```
-7. Open your browser to:
+   This will create venv, activate it, and install dependencies.
+
+5. Run the Flask app:
+   - From terminal: `python app.py`
+   - Or from VS Code: Press F5 (uses launch.json)
+
+6. Open your browser to:
    ```text
    http://127.0.0.1:5000
    ```
+
+## Manual Setup (if batch file doesn't work)
+
+1. Install Python 3.11 as above.
+
+2. In terminal (inside `project` folder):
+   ```powershell
+   py -3.11 -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   python -m pip install --upgrade pip setuptools wheel
+   python -m pip install -r requirements.txt
+   python app.py
+   ```
+
 
 ## Login Details
 

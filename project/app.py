@@ -4,7 +4,6 @@ import csv
 import io
 import numpy as np
 import cv2
-import face_recognition
 from io import BytesIO
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
@@ -18,6 +17,8 @@ DATABASE = os.path.join(BASE_DIR, "database.db")
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "images")
 DATASET_FOLDER = os.path.join(BASE_DIR, "dataset")
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+CASCADE_PATH = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+face_cascade = cv2.CascadeClassifier(CASCADE_PATH)
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(DATASET_FOLDER, exist_ok=True)
@@ -78,25 +79,43 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def load_known_faces():
+def load_face_recognizer():
     conn = get_db()
     rows = conn.execute("SELECT * FROM Students").fetchall()
     conn.close()
-    known_encodings = []
-    known_labels = []
+
+    face_samples = []
+    labels = []
+    label_map = {}
 
     for row in rows:
         file_path = os.path.join(BASE_DIR, row["image_path"])
         if not os.path.exists(file_path):
             continue
 
-        image = face_recognition.load_image_file(file_path)
-        encodings = face_recognition.face_encodings(image)
-        if encodings:
-            known_encodings.append(encodings[0])
-            known_labels.append((row["student_id"], row["name"]))
+        image = cv2.imread(file_path)
+        if image is None:
+            continue
 
-    return known_encodings, known_labels
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+        if len(faces) == 0:
+            continue
+
+        x, y, w, h = faces[0]
+        face_region = gray[y : y + h, x : x + w]
+
+        label = int(row["id"])
+        face_samples.append(face_region)
+        labels.append(label)
+        label_map[label] = (row["student_id"], row["name"])
+
+    if not face_samples:
+        return None, {}
+
+    recognizer = cv2.face.LBPHFaceRecognizer_create()
+    recognizer.train(face_samples, np.array(labels))
+    return recognizer, label_map
 
 
 def mark_attendance(student_id, name):
@@ -155,6 +174,42 @@ def login():
         return redirect(url_for("login"))
 
     return render_template("login.html")
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if session.get("user"):
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        confirm_password = request.form.get("confirm_password", "").strip()
+
+        if not username or not password or not confirm_password:
+            flash("Please complete all fields.", "warning")
+            return redirect(url_for("signup"))
+
+        if password != confirm_password:
+            flash("Passwords do not match. Please try again.", "danger")
+            return redirect(url_for("signup"))
+
+        conn = get_db()
+        try:
+            conn.execute(
+                "INSERT INTO Users (username, password) VALUES (?, ?)",
+                (username, password),
+            )
+            conn.commit()
+            conn.close()
+            flash("Account created successfully. Please sign in.", "success")
+            return redirect(url_for("login"))
+        except sqlite3.IntegrityError:
+            conn.close()
+            flash("Username already exists. Choose a different username.", "danger")
+            return redirect(url_for("signup"))
+
+    return render_template("signup.html")
 
 
 @app.route("/logout")
@@ -273,8 +328,8 @@ def start_scan():
     if not session.get("user"):
         return redirect(url_for("login"))
 
-    known_encodings, known_labels = load_known_faces()
-    if not known_encodings:
+    recognizer, label_map = load_face_recognizer()
+    if recognizer is None:
         flash("No registered student faces found. Add students before scanning.", "warning")
         return redirect(url_for("scanner"))
 
@@ -292,28 +347,31 @@ def start_scan():
         if not grabbed:
             continue
 
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        small_frame = cv2.resize(rgb_frame, (0, 0), fx=0.25, fy=0.25)
-        face_locations = face_recognition.face_locations(small_frame, model="hog")
-        face_encodings = face_recognition.face_encodings(small_frame, face_locations)
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray_frame, scaleFactor=1.1, minNeighbors=5)
 
-        for face_encoding in face_encodings:
-            distances = face_recognition.face_distance(known_encodings, face_encoding)
-            if len(distances) == 0:
+        for (x, y, w, h) in faces:
+            face_region = gray_frame[y : y + h, x : x + w]
+            try:
+                label, confidence = recognizer.predict(face_region)
+            except cv2.error:
                 continue
 
-            best_index = int(np.argmin(distances))
-            match = face_recognition.compare_faces([known_encodings[best_index]], face_encoding, tolerance=0.5)
-
-            if match and match[0]:
-                student_id, name = known_labels[best_index]
-                if student_id not in scanned_students:
+            if confidence < 70:
+                student_id, name = label_map.get(label, (None, None))
+                if student_id and student_id not in scanned_students:
                     scanned_students.add(student_id)
                     if mark_attendance(student_id, name):
                         flash(f"Marked attendance for {name}.", "success")
                     else:
                         flash(f"{name} already has attendance today.", "info")
 
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            label_info = label_map.get(label)
+            text = f"{label_info[1]} ({int(confidence)})" if label_info else f"Unknown ({int(confidence)})"
+            cv2.putText(frame, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+        cv2.imshow("Attendance Scanner", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 

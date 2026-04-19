@@ -1,5 +1,5 @@
 body {
-    background: #e7f1ff;
+    background: #f2f6fb;
     color: #243b55;
     min-height: 100vh;
     font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -22,12 +22,29 @@ a:hover {
 }
 
 .login-card {
-    max-width: 420px;
+    max-width: 460px;
     width: 100%;
     border: none;
-    border-radius: 1rem;
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 25px 45px rgba(15, 23, 42, 0.25);
+    border-radius: 1.25rem;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 30px 60px rgba(15, 23, 42, 0.2);
+}
+
+.login-card .card-title {
+    letter-spacing: 0.03em;
+}
+
+.login-card .form-control {
+    border-radius: 0.85rem;
+}
+
+.login-card .btn-primary {
+    border-radius: 0.85rem;
+    padding: 0.95rem 1.15rem;
+}
+
+.login-card .text-muted {
+    font-size: 0.95rem;
 }
 
 .sidebar {
@@ -56,12 +73,13 @@ a:hover {
 .card-custom {
     border: none;
     border-radius: 1rem;
-    box-shadow: 0 12px 30px rgba(72, 94, 116, 0.16);
+    box-shadow: 0 14px 40px rgba(72, 94, 116, 0.14);
 }
 
 .btn-primary {
     background-color: #1967d2;
     border-color: #1967d2;
+    box-shadow: 0 12px 20px rgba(25, 103, 210, 0.18);
 }
 
 .btn-primary:hover {
