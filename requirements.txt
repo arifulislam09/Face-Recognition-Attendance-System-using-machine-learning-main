@@ -2,3 +2,7 @@ opencv-python
 numpy
 face-recognition
 matplotlib
+Flask
+gunicorn
+opencv-python-headless
+numpy
