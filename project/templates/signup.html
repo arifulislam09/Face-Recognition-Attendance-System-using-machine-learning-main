@@ -12,7 +12,7 @@
       <div class="card login-card">
         <div class="card-body">
           <h3 class="card-title text-center mb-3">Face Detection System</h3>
-          <p class="text-secondary text-center mb-4">Create your admin account for attendance management</p>
+          <p class="text-secondary text-center mb-4">Student registration request (admin approval required)</p>
 
           {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -29,8 +29,16 @@
 
           <form method="post" class="mt-3">
             <div class="mb-3">
-              <label for="username" class="form-label">Username</label>
-              <input type="text" class="form-control" id="username" name="username" placeholder="Choose a username" required />
+              <label for="username" class="form-label">Email (Username)</label>
+              <input type="email" class="form-control" id="username" name="username" placeholder="student@email.com" required />
+            </div>
+            <div class="mb-3">
+              <label for="full_name" class="form-label">Full Name</label>
+              <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Enter your full name" required />
+            </div>
+            <div class="mb-3">
+              <label for="department" class="form-label">Department</label>
+              <input type="text" class="form-control" id="department" name="department" placeholder="Example: Computer Science" required />
             </div>
             <div class="mb-3">
               <label for="password" class="form-label">Password</label>

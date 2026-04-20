@@ -61,6 +61,61 @@ a:hover {
     font-size: 0.95rem;
 }
 
+.portal-switch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+    background: #edf2ff;
+    border-radius: 0.85rem;
+    padding: 0.4rem;
+}
+
+.portal-btn {
+    border: none;
+    border-radius: 0.7rem;
+    background: transparent;
+    color: #4d5a82;
+    font-weight: 600;
+    padding: 0.65rem 0.75rem;
+    transition: all 0.25s ease;
+}
+
+.portal-btn.active {
+    background: linear-gradient(135deg, #4f7ef0 0%, #6b54b7 100%);
+    color: #ffffff;
+    box-shadow: 0 8px 16px rgba(79, 126, 240, 0.3);
+}
+
+.portal-panel {
+    display: none;
+    animation: fadeInPortal 0.25s ease-in;
+}
+
+.portal-panel.active {
+    display: block;
+}
+
+.portal-note {
+    margin: 0.25rem 0 0.85rem;
+    font-size: 0.92rem;
+    color: #4b5563;
+    background: #f8faff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 0.65rem 0.75rem;
+}
+
+@keyframes fadeInPortal {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .sidebar {
     background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
