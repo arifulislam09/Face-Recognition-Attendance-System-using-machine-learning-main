@@ -72,8 +72,16 @@ project/
 - Register students with a face photo.
 - Go to Attendance Scanner and press Start Scan.
 - Attendance is matched automatically with registered faces.
+- The scanner draws real-time bounding boxes, tracks multiple faces, localizes landmarks, aligns faces, and shows emotion, demographic, and liveness hints when the model files are available.
 - View all entries in Attendance Records.
 - Download attendance as a CSV file.
+
+## Scanner Capability Notes
+
+- Real-time bounding boxes and face tracking run by default.
+- Facial landmark localization requires `models/lbfmodel.yaml` and OpenCV contrib support.
+- Demographic analysis requires the age and gender Caffe model files in `project/models`.
+- The live scanner runs locally with a webcam; it is not available on Render.
 
 ## Notes
 

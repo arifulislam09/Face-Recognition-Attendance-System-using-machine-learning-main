@@ -11,13 +11,18 @@
     <div class="d-flex">
       <div class="sidebar">
         <h4 class="text-white mb-4">Face Detection System</h4>
+        <div class="portal-badge {{ 'teacher' if is_admin else 'student' }} mb-3">
+          {{ 'Teacher Portal' if is_admin else 'Student Portal' }}
+        </div>
         <nav class="nav flex-column">
           <a class="nav-link active" href="{{ url_for('dashboard') }}">Dashboard</a>
           {% if is_admin %}
-          <a class="nav-link" href="{{ url_for('register') }}">Register Student</a>
+          <a class="nav-link" href="{{ url_for('register') }}">Student Management</a>
           <a class="nav-link" href="{{ url_for('scanner') }}">Attendance Scanner</a>
+          {% else %}
+          <a class="nav-link" href="{{ url_for('records') }}">My Attendance</a>
           {% endif %}
-          <a class="nav-link" href="{{ url_for('records') }}">Attendance Records</a>
+          <a class="nav-link" href="{{ url_for('records') }}">{{ 'Attendance Records' if is_admin else 'Attendance History' }}</a>
           <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
         </nav>
       </div>
@@ -25,7 +30,7 @@
         <nav class="navbar navbar-expand-lg navbar-custom px-4 py-3">
           <div class="container-fluid">
             <button class="btn btn-outline-light d-lg-none" type="button" id="sidebarToggle">Menu</button>
-            <span class="navbar-brand mb-0 h1 text-white">{{ 'Admin Dashboard' if is_admin else 'Student Dashboard' }}</span>
+            <span class="navbar-brand mb-0 h1 text-white">{{ 'Teacher Control Center' if is_admin else 'Student Learning Hub' }}</span>
             <div class="text-white">Welcome, {{ session['user'] }}</div>
           </div>
         </nav>
@@ -41,6 +46,19 @@
             {% endif %}
           {% endwith %}
 
+          <div class="role-hero {{ 'teacher' if is_admin else 'student' }} mb-4">
+            <div class="role-hero-content">
+              <h3 class="mb-2">{{ 'Teacher Workspace' if is_admin else 'Student Workspace' }}</h3>
+              <p class="mb-0">
+                {% if is_admin %}
+                Approve student requests, register face profiles, and run smart scanner from one dashboard.
+                {% else %}
+                View your attendance history, keep track of your daily record, and stay updated with your account status.
+                {% endif %}
+              </p>
+            </div>
+          </div>
+
           {% if is_admin %}
           <div class="alert alert-info" role="alert">
             <strong>Relation:</strong> Student account approval (Google/Signup) and face profile registration are separate steps.
@@ -48,17 +66,38 @@
           </div>
           {% endif %}
 
+          <div class="card card-custom p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+              <div>
+                <h5 class="mb-1">Vision Pipeline Status</h5>
+                <p class="text-muted mb-0">Real-time face detection and analysis capabilities.</p>
+              </div>
+              <div class="text-muted small">Model-dependent features turn on automatically when files are present.</div>
+            </div>
+
+            <div class="row g-3">
+              {% for capability_key, capability_label in capability_items %}
+              <div class="col-sm-6 col-lg-3">
+                <div class="capability-pill {{ 'available' if capability_status.get(capability_key) else 'unavailable' }}">
+                  <span>{{ capability_label }}</span>
+                  <strong>{{ 'Enabled' if capability_status.get(capability_key) else 'Model missing' }}</strong>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
           <div class="row g-4 mb-4">
             <div class="col-md-4">
               <div class="card card-custom p-4 h-100">
                 {% if is_admin %}
-                <h5>Registered Profiles</h5>
+                <h5>Face Profiles</h5>
                 <p class="display-6 fw-bold">{{ student_count }}</p>
-                <p class="text-muted">Step 2: total face profiles added by admin</p>
+                <p class="text-muted">Total students with registered face data</p>
                 {% else %}
-                <h5>Account Status</h5>
+                <h5>Profile Status</h5>
                 <p class="display-6 fw-bold">Approved</p>
-                <p class="text-muted">Your student account is active</p>
+                <p class="text-muted">Your student portal access is active</p>
                 {% endif %}
               </div>
             </div>
@@ -67,40 +106,75 @@
                 {% if is_admin %}
                 <h5>Pending Requests</h5>
                 <p class="display-6 fw-bold">{{ pending_student_requests }}</p>
-                <p class="text-muted">Step 1: student accounts waiting admin approval</p>
+                <p class="text-muted">Students waiting for teacher approval</p>
                 {% else %}
                 <h5>Today Attendance</h5>
                 <p class="display-6 fw-bold">{{ today_records }}</p>
-                <p class="text-muted">Attendance marked today</p>
+                <p class="text-muted">Total attendance entries recorded today</p>
                 {% endif %}
               </div>
             </div>
             <div class="col-md-4">
               <div class="card card-custom p-4 h-100">
                 {% if is_admin %}
-                <h5>Approved Students</h5>
+                <h5>Approved Accounts</h5>
                 <p class="display-6 fw-bold">{{ approved_student_accounts }}/{{ total_student_accounts }}</p>
-                <p class="text-muted">Approved student login accounts</p>
+                <p class="text-muted">Approved student logins vs total requests</p>
                 {% else %}
                 <h5>Total Records</h5>
                 <p class="display-6 fw-bold">{{ total_records }}</p>
-                <p class="text-muted">All attendance entries</p>
+                <p class="text-muted">All attendance entries in the system</p>
                 {% endif %}
               </div>
             </div>
           </div>
 
           {% if is_admin %}
+          <div class="card card-custom p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h4 class="mb-1">Teacher Features</h4>
+                <p class="text-muted mb-0">Power tools for teachers and attendance coordinators.</p>
+              </div>
+            </div>
+            <div class="row g-3 feature-grid">
+              <div class="col-md-6 col-xl-3">
+                <div class="feature-box">
+                  <h6>Student Approval</h6>
+                  <p>Review and approve new student signup requests quickly.</p>
+                </div>
+              </div>
+              <div class="col-md-6 col-xl-3">
+                <div class="feature-box">
+                  <h6>Face Profile Setup</h6>
+                  <p>Register student image and keep profile list updated.</p>
+                </div>
+              </div>
+              <div class="col-md-6 col-xl-3">
+                <div class="feature-box">
+                  <h6>Live Scanner</h6>
+                  <p>Run camera-based attendance scanner in real time.</p>
+                </div>
+              </div>
+              <div class="col-md-6 col-xl-3">
+                <div class="feature-box">
+                  <h6>Records Export</h6>
+                  <p>Track and download attendance reports for review.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="card card-custom p-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <div>
                 <h4 class="mb-1">Quick Actions</h4>
-                <p class="text-muted mb-0">Use the links below to go directly to each module.</p>
+                <p class="text-muted mb-0">Jump directly to core teacher modules.</p>
               </div>
             </div>
             <div class="row g-3">
               <div class="col-sm-6 col-xl-3">
-                <a href="{{ url_for('register') }}" class="btn btn-primary w-100">Register Student</a>
+                <a href="{{ url_for('register') }}" class="btn btn-primary w-100">Manage Students</a>
               </div>
               <div class="col-sm-6 col-xl-3">
                 <a href="{{ url_for('scanner') }}" class="btn btn-primary w-100">Start Scanner</a>
@@ -110,6 +184,109 @@
               </div>
               <div class="col-sm-6 col-xl-3">
                 <a href="{{ url_for('logout') }}" class="btn btn-secondary w-100">Logout</a>
+              </div>
+            </div>
+          </div>
+
+          {% else %}
+          <div class="card card-custom p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h4 class="mb-1">Student Features</h4>
+                <p class="text-muted mb-0">Everything a student needs in one place.</p>
+              </div>
+            </div>
+            <div class="row g-3 feature-grid">
+              <div class="col-md-6 col-xl-3">
+                <div class="feature-box">
+                  <h6>Attendance History</h6>
+                  <p>View your complete attendance report by date and time.</p>
+                </div>
+              </div>
+              <div class="col-md-6 col-xl-3">
+                <div class="feature-box">
+                  <h6>Daily Tracking</h6>
+                  <p>Monitor how many entries were created today.</p>
+                </div>
+              </div>
+              <div class="col-md-6 col-xl-3">
+                <div class="feature-box">
+                  <h6>Account Safety</h6>
+                  <p>Use dedicated student login with approval workflow.</p>
+                </div>
+              </div>
+              <div class="col-md-6 col-xl-3">
+                <div class="feature-box">
+                  <h6>Report Access</h6>
+                  <p>Open attendance table and export records when needed.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-custom p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h4 class="mb-1">Student Quick Actions</h4>
+                <p class="text-muted mb-0">Open your most-used pages from here.</p>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-sm-6 col-xl-4">
+                <a href="{{ url_for('records') }}" class="btn btn-primary w-100">Open Attendance History</a>
+              </div>
+              <div class="col-sm-6 col-xl-4">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary w-100">Refresh Dashboard</a>
+              </div>
+              <div class="col-sm-6 col-xl-4">
+                <a href="{{ url_for('logout') }}" class="btn btn-secondary w-100">Logout</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-4 mt-1">
+            <div class="col-lg-5">
+              <div class="card card-custom p-4 h-100">
+                <h5 class="mb-3">Student Profile</h5>
+                <div class="profile-meta">
+                  <p><strong>Name:</strong> {{ student_profile['full_name'] or student_profile['username'] }}</p>
+                  <p><strong>Username/Email:</strong> {{ student_profile['username'] }}</p>
+                  <p><strong>Department:</strong> {{ student_profile['department'] or 'Not set' }}</p>
+                  <p><strong>Approval Status:</strong> {{ student_profile['approval_status'] }}</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-7">
+              <div class="card card-custom p-4 h-100">
+                <h5 class="mb-3">My Recent Attendance</h5>
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% if recent_attendance %}
+                        {% for item in recent_attendance %}
+                        <tr>
+                          <td>{{ loop.index }}</td>
+                          <td>{{ item['date'] }}</td>
+                          <td>{{ item['time'] }}</td>
+                          <td>{{ item['status'] }}</td>
+                        </tr>
+                        {% endfor %}
+                      {% else %}
+                        <tr>
+                          <td colspan="4" class="text-center text-muted">No personal attendance records yet.</td>
+                        </tr>
+                      {% endif %}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>

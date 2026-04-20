@@ -8,6 +8,10 @@ Features:
 - Face recognition using machine learning
 - Attendance recording in a CSV file
 - User-friendly web interface
+- Real-time bounding boxes and multi-face tracking in the live scanner
+- Facial landmark localization for face alignment and normalization
+- Emotion recognition and optional age/gender demographic analysis
+- Liveness detection to reduce spoof attacks
 
 Installation:
 1. Clone the repository from GitHub:

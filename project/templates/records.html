@@ -11,11 +11,16 @@
     <div class="d-flex">
       <div class="sidebar">
         <h4 class="text-white mb-4">Face Detection System</h4>
+        <div class="portal-badge {{ 'teacher' if is_admin else 'student' }} mb-3">
+          {{ 'Teacher Portal' if is_admin else 'Student Portal' }}
+        </div>
         <nav class="nav flex-column">
           <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
-          <a class="nav-link" href="{{ url_for('register') }}">Register Student</a>
+          {% if is_admin %}
+          <a class="nav-link" href="{{ url_for('register') }}">Student Management</a>
           <a class="nav-link" href="{{ url_for('scanner') }}">Attendance Scanner</a>
-          <a class="nav-link active" href="{{ url_for('records') }}">Attendance Records</a>
+          {% endif %}
+          <a class="nav-link active" href="{{ url_for('records') }}">{{ 'Attendance Records' if is_admin else 'My Attendance' }}</a>
           <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
         </nav>
       </div>
@@ -23,7 +28,7 @@
         <nav class="navbar navbar-expand-lg navbar-custom px-4 py-3">
           <div class="container-fluid">
             <button class="btn btn-outline-light d-lg-none" type="button" id="sidebarToggle">Menu</button>
-            <span class="navbar-brand mb-0 h1 text-white">Attendance Records</span>
+            <span class="navbar-brand mb-0 h1 text-white">{{ 'Attendance Records' if is_admin else 'My Attendance Records' }}</span>
             <div class="text-white">{{ session['user'] }}</div>
           </div>
         </nav>
@@ -41,15 +46,38 @@
 
           <div class="card card-custom p-4 mb-4">
             <form class="row g-3 align-items-end" method="get" action="{{ url_for('records') }}">
-              <div class="col-md-4">
-                <label class="form-label">Search by Date</label>
+              <div class="col-md-2">
+                <label class="form-label">Exact Date</label>
                 <input type="date" class="form-control" name="date" value="{{ search_date }}" />
               </div>
-              <div class="col-md-3">
+              <div class="col-md-2">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-control" name="start_date" value="{{ start_date }}" />
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-control" name="end_date" value="{{ end_date }}" />
+              </div>
+              {% if is_admin %}
+              <div class="col-md-2">
+                <label class="form-label">Student Name</label>
+                <input type="text" class="form-control" name="student_name" value="{{ search_name }}" placeholder="e.g. Ariful" />
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Filter by Department</label>
+                <select class="form-select" name="department">
+                  <option value="">All Departments</option>
+                  {% for dept in departments %}
+                  <option value="{{ dept['department'] }}" {% if search_department == dept['department'] %}selected{% endif %}>{{ dept['department'] }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              {% endif %}
+              <div class="col-md-2">
                 <button type="submit" class="btn btn-primary w-100">Search</button>
               </div>
-              <div class="col-md-3">
-                <a href="{{ url_for('download_csv', date=search_date) }}" class="btn btn-outline-primary w-100">Download CSV</a>
+              <div class="col-md-2">
+                <a href="{{ url_for('download_csv', date=search_date, start_date=start_date, end_date=end_date, student_name=search_name, department=search_department) }}" class="btn btn-outline-primary w-100">Download CSV</a>
               </div>
               <div class="col-md-2 text-end">
                 <a href="{{ url_for('records') }}" class="btn btn-light w-100">Reset</a>
@@ -65,6 +93,9 @@
                     <th>#</th>
                     <th>Student ID</th>
                     <th>Name</th>
+                    {% if is_admin %}
+                    <th>Department</th>
+                    {% endif %}
                     <th>Date</th>
                     <th>Time</th>
                     <th>Status</th>
@@ -77,6 +108,9 @@
                         <td>{{ loop.index }}</td>
                         <td>{{ record['student_id'] }}</td>
                         <td>{{ record['name'] }}</td>
+                        {% if is_admin %}
+                        <td>{{ record['department'] }}</td>
+                        {% endif %}
                         <td>{{ record['date'] }}</td>
                         <td>{{ record['time'] }}</td>
                         <td>{{ record['status'] }}</td>
@@ -84,7 +118,7 @@
                     {% endfor %}
                   {% else %}
                     <tr>
-                      <td colspan="6" class="text-center text-muted">No attendance records found.</td>
+                      <td colspan="{{ 7 if is_admin else 6 }}" class="text-center text-muted">No attendance records found.</td>
                     </tr>
                   {% endif %}
                 </tbody>

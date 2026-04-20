@@ -13,4 +13,21 @@ window.addEventListener('load', () => {
     if (toggleButton) {
         toggleButton.addEventListener('click', toggleSidebar);
     }
+
+    const cameraSource = document.querySelector('#cameraSource');
+    const cameraIndexesField = document.querySelector('#cameraIndexesField');
+    const cameraUrlField = document.querySelector('#cameraUrlField');
+
+    function updateScannerFields() {
+        if (!cameraSource || !cameraIndexesField || !cameraUrlField) return;
+
+        const selected = cameraSource.value;
+        cameraIndexesField.style.display = selected === 'multiple' ? 'block' : 'none';
+        cameraUrlField.style.display = selected === 'phone_url' ? 'block' : 'none';
+    }
+
+    if (cameraSource) {
+        cameraSource.addEventListener('change', updateScannerFields);
+        updateScannerFields();
+    }
 });
