@@ -6,6 +6,11 @@ __pycache__/
 .venv/
 venv/
 
+# Environment variables - NEVER COMMIT CREDENTIALS
+.env
+.env.local
+*.env
+
 # Local app runtime data
 project/database.db
 Face Recognition/Attendance.csv

@@ -9,6 +9,10 @@ from io import BytesIO
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey123"
