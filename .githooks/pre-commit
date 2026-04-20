@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Block sensitive env files from being committed.
+blocked_files_regex='(^|/)(\.env|\.env\..+)$'
+
+staged_files=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if echo "$staged_files" | grep -Eq "$blocked_files_regex"; then
+  echo "ERROR: .env files are staged. Remove them before commit."
+  echo "Run: git rm --cached <file>"
+  exit 1
+fi
+
+# Basic secret pattern checks on staged content.
+# Exclude this hook file itself to avoid matching the pattern list in this script.
+if git diff --cached -- . ':(exclude).githooks/pre-commit' | grep -Eiq '(GOCSPX-|AIzaSy|-----BEGIN (RSA|EC|OPENSSH) PRIVATE KEY-----|aws_access_key_id|aws_secret_access_key)'; then
+  echo "ERROR: Possible secret detected in staged changes."
+  echo "Please remove or rotate the secret before committing."
+  exit 1
+fi
+
+exit 0
